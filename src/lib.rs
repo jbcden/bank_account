@@ -42,16 +42,25 @@ mod tests {
     fn update_balance_different_thread() {
         let account = Arc::new(Mutex::new(BankAccount::open()));
         let thread_account = account.clone();
-        thread::spawn(move || {
+        let mut handles = Vec::new();
+        let handle1 = thread::spawn(move || {
             thread_account.lock().unwrap().update_balance(10);
         });
 
         let thread_account_second = account.clone();
-        thread::spawn(move || {
+        let handle2 = thread::spawn(move || {
             let mut account = thread_account_second.lock().unwrap();
             account.update_balance(20);
             account.update_balance(-10);
         });
+
+        handles.push(handle1);
+        handles.push(handle2);
+
+        for handle in handles {
+            let _ = handle.join();
+        }
+
         assert_eq!(account.lock().unwrap().get_balance(), 20);
     }
 }
