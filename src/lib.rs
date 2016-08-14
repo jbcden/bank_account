@@ -1,22 +1,24 @@
 #![allow(dead_code)]
+#![feature(integer_atomics)]
 use std::sync::Arc;
+use std::sync::atomic::{AtomicI32, Ordering};
+
 struct BankAccount {
-    balance: Arc<i32>,
+    balance: Arc<AtomicI32>,
 }
 
 impl BankAccount {
     pub fn open() -> BankAccount {
-        BankAccount { balance: Arc::new(0) }
+        BankAccount { balance: Arc::new(AtomicI32::new(0)) }
     }
 
     pub fn get_balance(&self) -> i32 {
-        *self.balance
+        self.balance.load(Ordering::Relaxed)
     }
 
     pub fn update_balance(&mut self, amount: i32) {
-        let balance: i32 = *self.balance.clone();
-        let new_balance = balance + amount;
-        self.balance = Arc::new(new_balance);
+        self.balance.clone()
+                    .fetch_add(amount, Ordering::Relaxed);
     }
 }
 
@@ -25,11 +27,6 @@ mod tests {
     use std::sync::{Arc, Mutex};
     use std::thread;
     use super::BankAccount;
-    #[test]
-    fn it_sets_the_default_balance() {
-        let account = BankAccount::open();
-        assert_eq!(account.balance, Arc::new(0));
-    }
     #[test]
     fn get_balance() {
         let account = BankAccount::open();
@@ -43,11 +40,18 @@ mod tests {
     }
     #[test]
     fn update_balance_different_thread() {
-        let account = Arc::new(Mutex::new(BankAccount::open()));
-        let mut account = account.clone();
+        let mut account = Arc::new(Mutex::new(BankAccount::open()));
+        let thread_account = account.clone();
         thread::spawn(move || {
-            account.lock().unwrap().update_balance(10);
+            thread_account.lock().unwrap().update_balance(10);
         });
-        assert_eq!(account.lock().unwrap().get_balance(), 10);
+
+        let thread_account_second = account.clone();
+        thread::spawn(move || {
+            let mut account = thread_account_second.lock().unwrap();
+            account.update_balance(20);
+            account.update_balance(-10);
+        });
+        assert_eq!(account.lock().unwrap().get_balance(), 20);
     }
 }
