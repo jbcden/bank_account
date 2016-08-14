@@ -40,7 +40,7 @@ mod tests {
     }
     #[test]
     fn update_balance_different_thread() {
-        let mut account = Arc::new(Mutex::new(BankAccount::open()));
+        let account = Arc::new(Mutex::new(BankAccount::open()));
         let thread_account = account.clone();
         thread::spawn(move || {
             thread_account.lock().unwrap().update_balance(10);
