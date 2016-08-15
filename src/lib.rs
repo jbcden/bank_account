@@ -1,22 +1,20 @@
 #![allow(dead_code)]
 #![feature(integer_atomics)]
-use std::sync::atomic::{AtomicI32, Ordering};
+mod first {
+    use std::sync::atomic::{AtomicI32, Ordering};
 
-struct BankAccount {
-    balance: AtomicI32,
-}
+    type BankAccount = AtomicI32;
 
-impl BankAccount {
     pub fn open() -> BankAccount {
-        BankAccount { balance: AtomicI32::new(0) }
+        AtomicI32::new(0)
     }
 
-    pub fn get_balance(&self) -> i32 {
-        self.balance.load(Ordering::Relaxed)
+    pub fn get_balance(account: &BankAccount) -> i32 {
+        account.load(Ordering::Relaxed)
     }
 
-    pub fn update_balance(&mut self, amount: i32) {
-        self.balance.fetch_add(amount, Ordering::Relaxed);
+    pub fn update_balance(account: &mut BankAccount, amount: i32) {
+        account.fetch_add(amount, Ordering::Relaxed);
     }
 }
 
@@ -24,32 +22,32 @@ impl BankAccount {
 mod tests {
     use std::sync::{Arc, Mutex};
     use std::thread;
-    use super::BankAccount;
+    use super::first;
     #[test]
     fn get_balance() {
-        let account = BankAccount::open();
-        assert_eq!(account.get_balance(), 0);
+        let account = first::open();
+        assert_eq!(first::get_balance(&account), 0);
     }
     #[test]
     fn update_balance() {
-        let mut account = BankAccount::open();
-        account.update_balance(10);
-        assert_eq!(account.get_balance(), 10);
+        let mut account = first::open();
+        first::update_balance(&mut account, 10);
+        assert_eq!(first::get_balance(&account), 10);
     }
     #[test]
     fn update_balance_different_thread() {
-        let account = Arc::new(Mutex::new(BankAccount::open()));
+        let account = Arc::new(Mutex::new(first::open()));
         let thread_account = account.clone();
         let mut handles = Vec::new();
         let handle1 = thread::spawn(move || {
-            thread_account.lock().unwrap().update_balance(10);
+            first::update_balance(&mut thread_account.lock().unwrap(), 10);
         });
 
         let thread_account_second = account.clone();
         let handle2 = thread::spawn(move || {
             let mut account = thread_account_second.lock().unwrap();
-            account.update_balance(20);
-            account.update_balance(-10);
+            first::update_balance(&mut account, 20);
+            first::update_balance(&mut account, -10);
         });
 
         handles.push(handle1);
@@ -59,6 +57,6 @@ mod tests {
             let _ = handle.join();
         }
 
-        assert_eq!(account.lock().unwrap().get_balance(), 20);
+        assert_eq!(first::get_balance(&account.lock().unwrap()), 20);
     }
 }
