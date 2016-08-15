@@ -1,15 +1,14 @@
 #![allow(dead_code)]
 #![feature(integer_atomics)]
-use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
 
 struct BankAccount {
-    balance: Arc<AtomicI32>,
+    balance: AtomicI32,
 }
 
 impl BankAccount {
     pub fn open() -> BankAccount {
-        BankAccount { balance: Arc::new(AtomicI32::new(0)) }
+        BankAccount { balance: AtomicI32::new(0) }
     }
 
     pub fn get_balance(&self) -> i32 {
@@ -17,8 +16,7 @@ impl BankAccount {
     }
 
     pub fn update_balance(&mut self, amount: i32) {
-        self.balance.clone()
-                    .fetch_add(amount, Ordering::Relaxed);
+        self.balance.fetch_add(amount, Ordering::Relaxed);
     }
 }
 
